@@ -22,7 +22,7 @@ func main() {
 	refreshWallpaperList()
 
 	// Read data from photo IDs JSON
-	data, err := readFromFile("photoIDs.json")
+	data, err := readFromFile(os.Getenv("WALLPAPERS_DIR") + "/photoIDs.json")
 	if err != nil {
 		// IF the photoIDs.json is not present, try to create one
 		if err.Error() == "FILE DOES NOT EXIST" {
@@ -30,7 +30,7 @@ func main() {
 			if err != nil {
 				panic(err.Error())
 			}
-			err = writeContentToFile("photoIDs.json", data)
+			err = writeContentToFile(os.Getenv("WALLPAPERS_DIR") + "/photoIDs.json", data)
 			if err != nil {
 				panic(err.Error())
 			}
@@ -175,7 +175,7 @@ func sendWallpaper(bot *tgbotapi.BotAPI, chatID int64, wg *sync.WaitGroup, photo
 		if err != nil {
 			sendToAdmin(bot, err.Error())
 		}
-		err = writeContentToFile("photoIDs.json", data)
+		err = writeContentToFile(os.Getenv("WALLPAPERS_DIR") + "/photoIDs.json", data)
 		if err != nil {
 			sendToAdmin(bot, err.Error())
 		}
