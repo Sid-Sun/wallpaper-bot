@@ -57,7 +57,6 @@ func sendToAdmin(bot *tgbotapi.BotAPI, message string) {
 }
 
 func writeContentToFile(fileName string, fileContents []byte) error {
-	testWritePermissions()
 	err := ioutil.WriteFile(fileName, fileContents, 0644)
 	if err != nil {
 		return err
@@ -88,22 +87,4 @@ func fileExists(filename string) bool {
 		return false
 	}
 	return !info.IsDir()
-}
-
-func testWritePermissions() {
-	newFile, err := os.Create("test.txt")
-	if err != nil {
-		if os.IsPermission(err) {
-			panic("Error: Write permission denied.")
-		}
-		panic(err.Error())
-	}
-	err = newFile.Close()
-	if err != nil {
-		panic(err.Error())
-	}
-	err = os.Remove("test.txt")
-	if err != nil {
-		panic(err.Error())
-	}
 }
