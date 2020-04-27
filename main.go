@@ -21,7 +21,7 @@ func main() {
 	// Read available wallpapers list
 	refreshWallpaperList()
 
-	// Read photo IDs from JSON
+	// Read data from photo IDs JSON
 	data, err := readFromFile("photoIDs.json")
 	if err != nil {
 		// IF the photoIDs.json is not present, try to create one
@@ -34,12 +34,24 @@ func main() {
 			if err != nil {
 				panic(err.Error())
 			}
+		} else {
+			panic(err.Error())
 		}
-		panic(err.Error())
 	}
+	// Unmarshal JSON and store in map
 	err = json.Unmarshal(data, &photoIDMap)
 	if err != nil {
 		panic(err.Error())
+	}
+
+	// Populate photoList with already uploaded files
+	// This way we can delete the files once uploaded
+	// And be able to reuse them too
+	for val := range photoIDMap {
+		t := append(photoList, val)
+		if !strSliceHasDuplicates(t) {
+			photoList = t
+		}
 	}
 
 	// Actual BOT stuff
@@ -58,7 +70,7 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-
+	
 	adminChatID, err := strconv.ParseInt(os.Getenv("ADMIN_CHAT_ID"), 10, 64)
 	if err != nil {
 		panic(err.Error())
@@ -140,7 +152,8 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, adminChatID int6
 func sendWallpaper(bot *tgbotapi.BotAPI, chatID int64, wg *sync.WaitGroup, photoIDMap map[string]string, photoList []string, randomInt int) {
 	randomPhotoName := photoList[randomInt]
 	if photoIDMap[randomPhotoName] == "" {
-		data, err := ioutil.ReadFile("walls/" + randomPhotoName)
+		filePath := os.Getenv("WALLPAPERS_DIR") + "/" + randomPhotoName
+		data, err := ioutil.ReadFile(filePath)
 		if err != nil {
 			handleError(bot, err, chatID)
 		}
@@ -166,7 +179,11 @@ func sendWallpaper(bot *tgbotapi.BotAPI, chatID int64, wg *sync.WaitGroup, photo
 		if err != nil {
 			sendToAdmin(bot, err.Error())
 		}
-		fmt.Println("Had to upload")
+		// Once uploaded, delete the file
+		err = deleteFile(filePath)
+		if err != nil {
+			sendToAdmin(bot, err.Error())
+		}
 	} else {
 		// photo := tgbotapi.NewPhotoShare(update.Message.Chat.ID, photoIDMap[randomPhotoName])
 		document := tgbotapi.NewDocumentShare(chatID, photoIDMap[randomPhotoName])

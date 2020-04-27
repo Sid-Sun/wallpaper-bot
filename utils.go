@@ -9,6 +9,17 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 )
 
+func strSliceHasDuplicates(x []string) bool {
+	encountered := map[string]bool{}
+	for _, val := range x {
+		if encountered[val] == true {
+			return true
+		}
+		encountered[val] = true
+	}
+	return false
+}
+
 func hasDuplicates(x []int) bool {
 	encountered := map[int]bool{}
 	for _, val := range x {
@@ -22,7 +33,7 @@ func hasDuplicates(x []int) bool {
 
 func refreshWallpaperList() {
 	// Read available wallpapers list
-	files, err := ioutil.ReadDir("walls")
+	files, err := ioutil.ReadDir(os.Getenv("WALLPAPERS_DIR"))
 	if err != nil {
 		panic(err.Error())
 	}
@@ -64,6 +75,11 @@ func readFromFile(filePath string) ([]byte, error) {
 		return data, nil
 	}
 	return nil, errors.New("FILE DOES NOT EXIST")
+}
+
+func deleteFile(fileName string) error {
+	err := os.Remove(fileName)
+	return err
 }
 
 func fileExists(filename string) bool {
