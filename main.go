@@ -21,38 +21,11 @@ func main() {
 	// Read available wallpapers list
 	refreshWallpaperList()
 
-	// Read data from photo IDs JSON
-	data, err := readFromFile(os.Getenv("WALLPAPERS_DIR") + "/photoIDs.json")
-	if err != nil {
-		// IF the photoIDs.json is not present, try to create one
-		if err.Error() == "FILE DOES NOT EXIST" {
-			data, err = json.Marshal(photoIDMap)
-			if err != nil {
-				panic(err.Error())
-			}
-			err = writeContentToFile(os.Getenv("WALLPAPERS_DIR") + "/photoIDs.json", data)
-			if err != nil {
-				panic(err.Error())
-			}
-		} else {
-			panic(err.Error())
-		}
-	}
-	// Unmarshal JSON and store in map
-	err = json.Unmarshal(data, &photoIDMap)
-	if err != nil {
-		panic(err.Error())
-	}
+	// Read Photo IDs from JSON
+	readPhotoIDs()
 
-	// Populate photoList with already uploaded files
-	// This way we can delete the files once uploaded
-	// And be able to reuse them too
-	for val := range photoIDMap {
-		t := append(photoList, val)
-		if !strSliceHasDuplicates(t) {
-			photoList = t
-		}
-	}
+	// Populate photoList with already uploaded file IDs
+	populateWallpapersFromIDs()
 
 	// Actual BOT stuff
 	bot, err := tgbotapi.NewBotAPI(os.Getenv("API_TOKEN"))
@@ -70,7 +43,7 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	
+
 	adminChatID, err := strconv.ParseInt(os.Getenv("ADMIN_CHAT_ID"), 10, 64)
 	if err != nil {
 		panic(err.Error())
@@ -135,6 +108,7 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, adminChatID int6
 		} else if update.Message.Chat.ID == adminChatID {
 			if update.Message.Text == "/refresh" {
 				refreshWallpaperList()
+				populateWallpapersFromIDs()
 				sendToAdmin(bot, "Refreshed!")
 			} else if update.Message.Text == "/all" {
 				var wg sync.WaitGroup
@@ -175,7 +149,7 @@ func sendWallpaper(bot *tgbotapi.BotAPI, chatID int64, wg *sync.WaitGroup, photo
 		if err != nil {
 			sendToAdmin(bot, err.Error())
 		}
-		err = writeContentToFile(os.Getenv("WALLPAPERS_DIR") + "/photoIDs.json", data)
+		err = writeContentToFile(os.Getenv("WALLPAPERS_DIR")+"/photoIDs.json", data)
 		if err != nil {
 			sendToAdmin(bot, err.Error())
 		}
