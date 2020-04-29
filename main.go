@@ -63,61 +63,86 @@ func getUpdates(bot *tgbotapi.BotAPI, updates tgbotapi.UpdatesChannel, adminChat
 
 func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, adminChatID int64) {
 	if update.Message.Chat.IsPrivate() {
-		messageSlice := strings.Fields(update.Message.Text)
-		if messageSlice[0] == "/wallpapers" || messageSlice[0] == "/wallpaper" {
-			var wg sync.WaitGroup
-			var numberOfWallpapers int
-
-			if len(messageSlice) != 1 {
-				var err error
-				numberOfWallpapers, err = strconv.Atoi(messageSlice[1])
-				if err != nil {
-					numberOfWallpapers = 1
-				}
-				if numberOfWallpapers > 10 && update.Message.Chat.ID != adminChatID {
-					numberOfWallpapers = 10
-				} else if numberOfWallpapers > len(photoList) {
-					// Cap number of wallpapers to length of photolist if less than 10 walls are requested and even fewer are available
-					numberOfWallpapers = len(photoList)
-				}
-			} else {
-				numberOfWallpapers = 1
-			}
-
-			var wallpapersSent []int
-			for i := 0; i < numberOfWallpapers; i++ {
-				wg.Add(1)
-				rand.Seed(time.Now().UnixNano())
-				randomInt := rand.Intn(len(photoList))
-				temp := append(wallpapersSent, randomInt)
-				if hasDuplicates(temp) {
-					i--
-					continue
-				}
-				wallpapersSent = temp
-				go sendWallpaper(bot, update.Message.Chat.ID, &wg, photoIDMap, photoList, randomInt)
-			}
-
-			wg.Wait()
-		} else if messageSlice[0] == "/start" {
-			helloMessage := tgbotapi.NewMessage(update.Message.Chat.ID, "Hello! I am Wallpaper Bot, to request one wallpaper, send /wallpaper, to get multiple, send /wallpapers <count (limited to 10)>!")
-			helloMessage.ReplyToMessageID = update.Message.MessageID
-			if _, err := bot.Send(helloMessage); err != nil {
-				handleError(bot, err, update.Message.Chat.ID)
-			}
-		} else if update.Message.Chat.ID == adminChatID {
-			if update.Message.Text == "/refresh" {
-				refreshWallpaperList()
-				populateWallpapersFromIDs()
-				sendToAdmin(bot, "Refreshed!")
-			} else if update.Message.Text == "/all" {
+		if messageSlice := strings.Fields(update.Message.Text); len(messageSlice) > 0 {
+			switch messageSlice[0] {
+			case "/wallpaper", "/wallpapers":
 				var wg sync.WaitGroup
-				for i := 0; i < len(photoList); i++ {
-					wg.Add(1)
-					go sendWallpaper(bot, update.Message.Chat.ID, &wg, photoIDMap, photoList, i)
+				var numberOfWallpapers int
+
+				if len(messageSlice) == 1 {
+					numberOfWallpapers = 1
+				} else {
+					var err error
+					numberOfWallpapers, err = strconv.Atoi(messageSlice[1])
+					if err != nil {
+						numberOfWallpapers = 1
+					}
+					if numberOfWallpapers > 10 && update.Message.Chat.ID != adminChatID {
+						numberOfWallpapers = 10
+					} else if numberOfWallpapers > len(photoList) {
+						// Cap number of wallpapers to length of photolist
+						// If less than 10 walls are requested and even fewer are available
+						numberOfWallpapers = len(photoList)
+					}
 				}
+
+				var wallpapersSent []int
+				for i := 0; i < numberOfWallpapers; i++ {
+					rand.Seed(time.Now().UnixNano())
+					randomInt := rand.Intn(len(photoList))
+					temp := append(wallpapersSent, randomInt)
+					if hasDuplicates(temp) {
+						i--
+						continue
+					}
+					wallpapersSent = temp
+					wg.Add(1)
+					go sendWallpaper(bot, update.Message.Chat.ID, &wg, photoIDMap, photoList, randomInt)
+				}
+
 				wg.Wait()
-				sendToAdmin(bot, "That would be all!")
+			case "/start":
+				helloMessage := tgbotapi.NewMessage(update.Message.Chat.ID, "Hello! I am Wallpaper Bot, to request one wallpaper, send /wallpaper, to get multiple, send /wallpapers <count (limited to 10)>!")
+				helloMessage.ReplyToMessageID = update.Message.MessageID
+				if _, err := bot.Send(helloMessage); err != nil {
+					handleError(bot, err, update.Message.Chat.ID)
+				}
+			case "/refresh":
+				if update.Message.Chat.ID == adminChatID {
+					refreshWallpaperList()
+					populateWallpapersFromIDs()
+					sendToAdmin(bot, "Refreshed!")
+				}
+			case "/all":
+				if update.Message.Chat.ID == adminChatID {
+					var wg sync.WaitGroup
+					for i := 0; i < len(photoList); i++ {
+						wg.Add(1)
+						go sendWallpaper(bot, update.Message.Chat.ID, &wg, photoIDMap, photoList, i)
+					}
+					wg.Wait()
+					sendToAdmin(bot, "That would be all!")
+				}
+			}
+		} else if update.Message.Document.FileID != "" {
+			if update.Message.Chat.ID == adminChatID {
+				fileName := update.Message.Document.FileName
+				fileID := update.Message.Document.FileID
+				if photoIDMap[fileName] == "" {
+					photoIDMap[fileName] = fileID
+					data, err := json.Marshal(photoIDMap)
+					if err != nil {
+						sendToAdmin(bot, err.Error())
+					}
+					err = writeContentToFile(os.Getenv("WALLPAPERS_DIR")+"/photoIDs.json", data)
+					if err != nil {
+						sendToAdmin(bot, err.Error())
+					}
+					populateWallpapersFromIDs()
+					sendToAdmin(bot, "Added: "+fileName+" and refreshed the IDs")
+				} else {
+					sendToAdmin(bot, "Wallpaper already in database")
+				}
 			}
 		}
 	}
