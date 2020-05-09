@@ -41,7 +41,10 @@ func refreshWallpaperList() {
 	// Empty List first
 	photoList = []string{}
 	for _, file := range files {
-		photoList = append(photoList, file.Name())
+		// Don't add photoIDs to list
+		if file.Name() != "photoIDs.json" {
+			photoList = append(photoList, file.Name())
+		}
 	}
 }
 
@@ -75,9 +78,12 @@ func populateWallpapersFromIDs() {
 	// This way we can delete the files once uploaded
 	// And be able to reuse them too
 	for val := range photoIDMap {
-		t := append(photoList, val)
-		if !strSliceHasDuplicates(t) {
-			photoList = t
+		// Don't add photoIDs to list
+		if val != "photoIDs.json" {
+			t := append(photoList, val)
+			if !strSliceHasDuplicates(t) {
+				photoList = t
+			}
 		}
 	}
 }
