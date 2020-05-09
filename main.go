@@ -110,6 +110,7 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, adminChatID int6
 			case "/refresh":
 				if update.Message.Chat.ID == adminChatID {
 					refreshWallpaperList()
+					readPhotoIDs()
 					populateWallpapersFromIDs()
 					sendToAdmin(bot, "Refreshed!")
 				}
