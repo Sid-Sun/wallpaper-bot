@@ -1,0 +1,6 @@
+version: '3.7'
+
+services:
+  wall-bot:
+    build: .
+    env_file: prod.env
