@@ -107,13 +107,6 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, adminChatID int6
 				if _, err := bot.Send(helloMessage); err != nil {
 					handleError(bot, err, update.Message.Chat.ID)
 				}
-			case "/refresh":
-				if update.Message.Chat.ID == adminChatID {
-					refreshWallpaperList()
-					readPhotoIDs()
-					populateWallpapersFromIDs()
-					sendToAdmin(bot, "Refreshed!")
-				}
 			case "/all":
 				if update.Message.Chat.ID == adminChatID {
 					var wg sync.WaitGroup
