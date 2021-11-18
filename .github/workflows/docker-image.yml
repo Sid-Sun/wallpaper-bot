@@ -17,4 +17,4 @@ jobs:
         run: |
           docker build . --file Dockerfile --tag $DOCKER_ID/wallpaper-bot:v2
           echo $DOCKER_PASSWORD | docker login -u $DOCKER_ID --password-stdin
-          docker push $DOCKER_ID/oxford-dict-bot:v2
+          docker push $DOCKER_ID/wallpaper-bot:v2
