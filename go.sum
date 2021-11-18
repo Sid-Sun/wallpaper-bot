@@ -1,7 +1,7 @@
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/fitant/storage-engine-go v0.0.1-alpha.2 h1:DJpy7XCjRlDFuqBJaya2se22GBsDZI3RJi2jmCyy+Mw=
-github.com/fitant/storage-engine-go v0.0.1-alpha.2/go.mod h1:4f1cW+BLF5iQapU4g36HoaqArJoDof7BLO27PFFJG/g=
+github.com/fitant/storage-engine-go v0.0.1-alpha.3 h1:7AfUm96kOXsINk+maTb+G1+KI1/c6XV3M9h/ECd4PSE=
+github.com/fitant/storage-engine-go v0.0.1-alpha.3/go.mod h1:4f1cW+BLF5iQapU4g36HoaqArJoDof7BLO27PFFJG/g=
 github.com/go-telegram-bot-api/telegram-bot-api v4.6.4+incompatible h1:2cauKuaELYAEARXRkq2LrJ0yDDv1rW7+wrTEdVL3uaU=
 github.com/go-telegram-bot-api/telegram-bot-api v4.6.4+incompatible/go.mod h1:qf9acutJ8cwBUhm1bqgz6Bei9/C/c93FPDljKWwsOgM=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
