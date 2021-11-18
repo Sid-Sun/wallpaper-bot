@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"strconv"
@@ -11,18 +10,17 @@ import (
 	"sync"
 	"time"
 
+	storageengine "github.com/fitant/storage-engine-go/storageengine"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 )
 
 var photoIDMap = make(map[string]string)
 var photoList []string
+var listMutex *sync.Mutex
+var photoListObject *storageengine.Object
 
 func main() {
-	// Read available wallpapers list
-	refreshWallpaperList()
-
-	// Read Photo IDs from JSON
-	readPhotoIDs()
+	loadDataFromSE()
 
 	// Populate photoList with already uploaded file IDs
 	populateWallpapersFromIDs()
@@ -66,6 +64,15 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, adminChatID int6
 		if messageSlice := strings.Fields(update.Message.Text); len(messageSlice) > 0 {
 			switch messageSlice[0] {
 			case "/wallpaper", "/wallpapers":
+				if len(photoList) == 0 {
+					allOut := tgbotapi.NewMessage(update.Message.Chat.ID, "It is a time of great stringency. We have no wallpapers. We are all out. We will service you once the galactic economy comes out of recession.")
+					allOut.ReplyToMessageID = update.Message.MessageID
+					if _, err := bot.Send(allOut); err != nil {
+						handleError(bot, err, update.Message.Chat.ID)
+					}
+					break
+				}
+
 				var wg sync.WaitGroup
 				var numberOfWallpapers int
 
@@ -97,7 +104,7 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, adminChatID int6
 					}
 					wallpapersSent = temp
 					wg.Add(1)
-					go sendWallpaper(bot, update.Message.Chat.ID, &wg, photoIDMap, photoList, randomInt)
+					go sendWallpaper(bot, update.Message.Chat.ID, &wg, randomInt)
 				}
 
 				wg.Wait()
@@ -112,7 +119,7 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, adminChatID int6
 					var wg sync.WaitGroup
 					for i := 0; i < len(photoList); i++ {
 						wg.Add(1)
-						go sendWallpaper(bot, update.Message.Chat.ID, &wg, photoIDMap, photoList, i)
+						go sendWallpaper(bot, update.Message.Chat.ID, &wg, i)
 					}
 					wg.Wait()
 					sendToAdmin(bot, "That would be all!")
@@ -123,15 +130,21 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, adminChatID int6
 				fileName := update.Message.Document.FileName
 				fileID := update.Message.Document.FileID
 				if photoIDMap[fileName] == "" {
+					listMutex.Lock()
 					photoIDMap[fileName] = fileID
 					data, err := json.Marshal(photoIDMap)
 					if err != nil {
 						sendToAdmin(bot, err.Error())
 					}
-					err = writeContentToFile(os.Getenv("WALLPAPERS_DIR")+"/photoIDs.json", data)
+					err = photoListObject.SetData(string(data))
 					if err != nil {
 						sendToAdmin(bot, err.Error())
 					}
+					err = photoListObject.Publish()
+					if err != nil {
+						sendToAdmin(bot, err.Error())
+					}
+					listMutex.Unlock()
 					populateWallpapersFromIDs()
 					sendToAdmin(bot, "Added: "+fileName+" and refreshed the IDs")
 				} else {
@@ -142,49 +155,13 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, adminChatID int6
 	}
 }
 
-func sendWallpaper(bot *tgbotapi.BotAPI, chatID int64, wg *sync.WaitGroup, photoIDMap map[string]string, photoList []string, randomInt int) {
+func sendWallpaper(bot *tgbotapi.BotAPI, chatID int64, wg *sync.WaitGroup, randomInt int) {
 	randomPhotoName := photoList[randomInt]
-	if photoIDMap[randomPhotoName] == "" {
-		filePath := os.Getenv("WALLPAPERS_DIR") + "/" + randomPhotoName
-		data, err := ioutil.ReadFile(filePath)
-		if err != nil {
-			handleError(bot, err, chatID)
-		}
-		file := tgbotapi.FileBytes{
-			Name:  randomPhotoName,
-			Bytes: data,
-		}
-		document := tgbotapi.NewDocumentUpload(chatID, file)
-		// photo := tgbotapi.NewPhotoUpload(update.Message.Chat.ID, file)
-		document.Caption = randomPhotoName
-		res, err := bot.Send(document)
-		if err != nil {
-			handleError(bot, err, chatID)
-		}
-		DocumentID := res.Document.FileID
-		// PhotoID := (*res.Photo)[len(*res.Photo)-1].FileID
-		photoIDMap[randomPhotoName] = DocumentID
-		data, err = json.Marshal(photoIDMap)
-		if err != nil {
-			sendToAdmin(bot, err.Error())
-		}
-		err = writeContentToFile(os.Getenv("WALLPAPERS_DIR")+"/photoIDs.json", data)
-		if err != nil {
-			sendToAdmin(bot, err.Error())
-		}
-		// Once uploaded, delete the file
-		err = deleteFile(filePath)
-		if err != nil {
-			sendToAdmin(bot, err.Error())
-		}
-	} else {
-		// photo := tgbotapi.NewPhotoShare(update.Message.Chat.ID, photoIDMap[randomPhotoName])
-		document := tgbotapi.NewDocumentShare(chatID, photoIDMap[randomPhotoName])
-		document.Caption = randomPhotoName
-		_, err := bot.Send(document)
-		if err != nil {
-			handleError(bot, err, chatID)
-		}
+	document := tgbotapi.NewDocumentShare(chatID, photoIDMap[randomPhotoName])
+	document.Caption = randomPhotoName
+	_, err := bot.Send(document)
+	if err != nil {
+		handleError(bot, err, chatID)
 	}
 	wg.Done()
 }

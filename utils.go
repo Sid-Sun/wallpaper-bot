@@ -2,75 +2,62 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
-	"io/ioutil"
+	"log"
+	"net/http"
 	"os"
 	"strconv"
+	"sync"
 
+	storageengine "github.com/fitant/storage-engine-go/storageengine"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 )
 
 func strSliceHasDuplicates(x []string) bool {
 	encountered := map[string]bool{}
 	for _, val := range x {
-		if encountered[val] == true {
+		if encountered[val] {
 			return true
 		}
 		encountered[val] = true
 	}
 	return false
+}
+
+func loadDataFromSE() {
+	listMutex = new(sync.Mutex)
+	if seClient, err := storageengine.NewClientConfig(http.DefaultClient, os.Getenv("SE_URL")); err != nil {
+		panic(err)
+	} else {
+		photoListObject, err = storageengine.NewObject(seClient)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	photoListObject.SetID(os.Getenv("SE_OBJ_ID"))
+	photoListObject.SetPassword(os.Getenv("SE_OBJ_PASS"))
+	if err := photoListObject.Refresh(); err != nil {
+		log.Print(err)
+	}
+	if photoListObject.GetData() == "" {
+		log.Print("fetch from SE failed presumably due to 404 - doing a fresh start")
+	} else {
+		err := json.Unmarshal([]byte(photoListObject.GetData()), &photoIDMap)
+		if err != nil {
+			log.Print(err)
+		}
+	}
 }
 
 func hasDuplicates(x []int) bool {
 	encountered := map[int]bool{}
 	for _, val := range x {
-		if encountered[val] == true {
+		if encountered[val] {
 			return true
 		}
 		encountered[val] = true
 	}
 	return false
-}
-
-func refreshWallpaperList() {
-	// Read available wallpapers list
-	files, err := ioutil.ReadDir(os.Getenv("WALLPAPERS_DIR"))
-	if err != nil {
-		panic(err.Error())
-	}
-	// Empty List first
-	photoList = []string{}
-	for _, file := range files {
-		// Don't add photoIDs to list
-		if file.Name() != "photoIDs.json" {
-			photoList = append(photoList, file.Name())
-		}
-	}
-}
-
-func readPhotoIDs() {
-	// Read data from photo IDs JSON
-	data, err := readFromFile(os.Getenv("WALLPAPERS_DIR") + "/photoIDs.json")
-	if err != nil {
-		// IF the photoIDs.json is not present, try to create one
-		if err.Error() == "FILE DOES NOT EXIST" {
-			data, err = json.Marshal(photoIDMap)
-			if err != nil {
-				panic(err.Error())
-			}
-			err = writeContentToFile(os.Getenv("WALLPAPERS_DIR")+"/photoIDs.json", data)
-			if err != nil {
-				panic(err.Error())
-			}
-		} else {
-			panic(err.Error())
-		}
-	}
-	// Unmarshal JSON and store in map
-	err = json.Unmarshal(data, &photoIDMap)
-	if err != nil {
-		panic(err.Error())
-	}
 }
 
 func populateWallpapersFromIDs() {
@@ -98,37 +85,4 @@ func sendToAdmin(bot *tgbotapi.BotAPI, message string) {
 	adminChatID, _ := strconv.ParseInt(os.Getenv("ADMIN_CHAT_ID"), 10, 64)
 	msg := tgbotapi.NewMessage(adminChatID, message)
 	_, _ = bot.Send(msg)
-}
-
-func writeContentToFile(fileName string, fileContents []byte) error {
-	err := ioutil.WriteFile(fileName, fileContents, 0644)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func readFromFile(filePath string) ([]byte, error) {
-	// Check if file exists and if not, print
-	if fileExists(filePath) {
-		data, err := ioutil.ReadFile(filePath)
-		if err != nil {
-			return nil, err
-		}
-		return data, nil
-	}
-	return nil, errors.New("FILE DOES NOT EXIST")
-}
-
-func deleteFile(fileName string) error {
-	err := os.Remove(fileName)
-	return err
-}
-
-func fileExists(filename string) bool {
-	info, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return !info.IsDir()
 }
