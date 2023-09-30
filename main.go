@@ -1,14 +1,15 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"math/rand"
+	"log"
+	"math/big"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	storageengine "github.com/fitant/storage-engine-go/storageengine"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -73,7 +74,6 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, adminChatID int6
 					break
 				}
 
-				var wg sync.WaitGroup
 				var numberOfWallpapers int
 
 				if len(messageSlice) == 1 {
@@ -86,28 +86,29 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, adminChatID int6
 					}
 					if numberOfWallpapers > 10 && update.Message.Chat.ID != adminChatID {
 						numberOfWallpapers = 10
-					} else if numberOfWallpapers > len(photoList) {
+					}
+					if numberOfWallpapers > len(photoList) {
 						// Cap number of wallpapers to length of photolist
-						// If less than 10 walls are requested and even fewer are available
 						numberOfWallpapers = len(photoList)
 					}
 				}
 
 				var wallpapersSent []int
 				for i := 0; i < numberOfWallpapers; i++ {
-					rand.Seed(time.Now().UnixNano())
-					randomInt := rand.Intn(len(photoList))
+					rBInt, err := rand.Int(rand.Reader, big.NewInt(int64(len(photoList))))
+					if err != nil {
+						log.Print("entropy reached!")
+						return
+					}
+					randomInt := int(rBInt.Int64())
 					temp := append(wallpapersSent, randomInt)
 					if hasDuplicates(temp) {
 						i--
 						continue
 					}
 					wallpapersSent = temp
-					wg.Add(1)
-					go sendWallpaper(bot, update.Message.Chat.ID, &wg, randomInt)
+					sendWallpaper(bot, update.Message.Chat.ID, randomInt)
 				}
-
-				wg.Wait()
 			case "/start":
 				helloMessage := tgbotapi.NewMessage(update.Message.Chat.ID, "Hello! I am Wallpaper Bot, to request one wallpaper, send /wallpaper, to get multiple, send /wallpapers <count (limited to 10)>!")
 				helloMessage.ReplyToMessageID = update.Message.MessageID
@@ -116,12 +117,9 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, adminChatID int6
 				}
 			case "/all":
 				if update.Message.Chat.ID == adminChatID {
-					var wg sync.WaitGroup
 					for i := 0; i < len(photoList); i++ {
-						wg.Add(1)
-						go sendWallpaper(bot, update.Message.Chat.ID, &wg, i)
+						sendWallpaper(bot, update.Message.Chat.ID, i)
 					}
-					wg.Wait()
 					sendToAdmin(bot, "That would be all!")
 				}
 			}
@@ -155,7 +153,7 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, adminChatID int6
 	}
 }
 
-func sendWallpaper(bot *tgbotapi.BotAPI, chatID int64, wg *sync.WaitGroup, randomInt int) {
+func sendWallpaper(bot *tgbotapi.BotAPI, chatID int64, randomInt int) {
 	randomPhotoName := photoList[randomInt]
 	document := tgbotapi.NewDocument(chatID, tgbotapi.FileID(photoIDMap[randomPhotoName]))
 	document.Caption = randomPhotoName
@@ -163,5 +161,4 @@ func sendWallpaper(bot *tgbotapi.BotAPI, chatID int64, wg *sync.WaitGroup, rando
 	if err != nil {
 		handleError(bot, err, chatID)
 	}
-	wg.Done()
 }
