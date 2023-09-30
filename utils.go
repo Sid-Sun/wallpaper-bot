@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	storageengine "github.com/fitant/storage-engine-go/storageengine"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func strSliceHasDuplicates(x []string) bool {

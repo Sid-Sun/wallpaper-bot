@@ -11,7 +11,7 @@ import (
 	"time"
 
 	storageengine "github.com/fitant/storage-engine-go/storageengine"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 var photoIDMap = make(map[string]string)
@@ -37,7 +37,7 @@ func main() {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
-	updates, err := bot.GetUpdatesChan(u)
+	updates := bot.GetUpdatesChan(u)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -157,7 +157,7 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, adminChatID int6
 
 func sendWallpaper(bot *tgbotapi.BotAPI, chatID int64, wg *sync.WaitGroup, randomInt int) {
 	randomPhotoName := photoList[randomInt]
-	document := tgbotapi.NewDocumentShare(chatID, photoIDMap[randomPhotoName])
+	document := tgbotapi.NewDocument(chatID, tgbotapi.FileID(photoIDMap[randomPhotoName]))
 	document.Caption = randomPhotoName
 	_, err := bot.Send(document)
 	if err != nil {
